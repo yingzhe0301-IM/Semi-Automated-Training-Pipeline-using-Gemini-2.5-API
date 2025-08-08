@@ -18,7 +18,6 @@ This repository shows how to turn those detections into high‑quality training 
 | **⏱️ Latency** – cloud round‑trip time       | After fine‑tuning YOLO the model runs on‑device in milliseconds |
 | **🎯 Accuracy** – API misses edge‑cases      | Human‑in‑the‑loop review in Label Studio fixes bad boxes |
 
-**Result:** a **cost‑effective** and **time‑efficient** workflow that keeps Gemini‑level detection quality while removing API cost and latency in production.
 
 ---
 
