@@ -26,7 +26,7 @@ This repository shows how to turn those detections into high‑quality training 
 <table>
 <tr>
 <td width="50%"><strong>Complex Scene – “Find the spill on the desk”</strong><br/><br/><img src="example/spill.png"></td>
-<td width="50%"><strong>Safety Compliance – “Detect workers <i>without</i> helmets”</strong><br/><br/><img src="example/person_with_helmet.PNG"></td>
+<td width="50%"><strong>Safety Compliance – “Detect workers <i>with/without</i> helmets”</strong><br/><br/><img src="example/person_with_helmet.PNG"></td>
 </tr>
 </table>
 
