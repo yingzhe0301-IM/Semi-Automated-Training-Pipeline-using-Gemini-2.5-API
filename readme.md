@@ -12,11 +12,11 @@ This repository shows how to turn those detections into high‑quality training 
 
 ## 🚀 What Problem Does This Solve?
 
-| Challenge when using the Gemini API directly | Our Solution |
+| Challenge of inference with Gemini           | Our Solution |
 |----------------------------------------------|--------------|
-| **💸 Cost** – every inference call is billed | Use Gemini only once to draft annotations, then train YOLO locally |
-| **⏱️ Latency** – cloud round‑trip time        | After fine‑tuning YOLO the model runs on‑device in milliseconds |
-| **🎯 Accuracy** – API misses edge‑cases       | Human‑in‑the‑loop review in Label Studio fixes bad boxes |
+| **💸 Cost** – every inference call is billed | Use Gemini to draft annotations, then train YOLO locally |
+| **⏱️ Latency** – cloud round‑trip time       | After fine‑tuning YOLO the model runs on‑device in milliseconds |
+| **🎯 Accuracy** – API misses edge‑cases      | Human‑in‑the‑loop review in Label Studio fixes bad boxes |
 
 **Result:** a **cost‑effective** and **time‑efficient** workflow that keeps Gemini‑level detection quality while removing API cost and latency in production.
 
