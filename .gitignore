@@ -1,8 +1,16 @@
-# JetBrains IDE 配置文件
+# Local IDE and notebook state
 /.idea/
+/.ipynb_checkpoints/
 
-# 忽略所有 JSON 文件
-*.json
+# Python cache
+/__pycache__/
+*.py[cod]
 
-# 忽略 output_results 文件夹
+# Generated artifacts
 /output_results/
+/tasks.json
+/import_to_ls_gcs.json
+/frames_jpg/
+
+# Local OS files
+.DS_Store

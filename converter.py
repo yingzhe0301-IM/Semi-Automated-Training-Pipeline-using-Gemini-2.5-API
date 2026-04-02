@@ -1,74 +1,197 @@
-import os
+"""Convert Gemini detections into Label Studio task JSON."""
+
+from __future__ import annotations
+
+import argparse
 import json
-from PIL import Image
+import os
+from pathlib import Path
+from typing import Any
 
-# --- NEW CONFIGURATION: SET YOUR BUCKET DETAILS HERE ---
-BUCKET_NAME = "yingzhe_gemini_fish"  # 替换成你刚刚创建的存储桶名字
-BUCKET_PREFIX = "fish_images/"  # 我们在桶里创建的文件夹名
-
-# --- Other Configurations ---
-GEMINI_JSON_FOLDER = "output_results"
-ORIGINAL_IMAGE_FOLDER = "test_image"
-LABEL_STUDIO_EXPORT_FILE = "import_to_ls_gcs.json"  # New output file name
+DEFAULT_JSON_DIR = Path("output_results")
+DEFAULT_IMAGE_DIR = Path("test_image")
+DEFAULT_LOCAL_OUTPUT = Path("tasks.json")
+DEFAULT_GCS_OUTPUT = Path("import_to_ls_gcs.json")
+DEFAULT_MODEL_VERSION = os.getenv("LABEL_STUDIO_MODEL_VERSION", "gemini-3-flash-preview")
+SUPPORTED_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".bmp")
 
 
-def convert_to_label_studio_format():
-    label_studio_tasks = []
-    print(f"Starting conversion for GCS from '{GEMINI_JSON_FOLDER}'...")
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Create Label Studio task files from Gemini detection JSON."
+    )
+    parser.add_argument(
+        "--json-dir",
+        type=Path,
+        default=DEFAULT_JSON_DIR,
+        help=f"Directory containing Gemini JSON outputs. Default: {DEFAULT_JSON_DIR}",
+    )
+    parser.add_argument(
+        "--image-dir",
+        type=Path,
+        default=DEFAULT_IMAGE_DIR,
+        help=f"Directory containing original images. Default: {DEFAULT_IMAGE_DIR}",
+    )
+    parser.add_argument(
+        "--local-output",
+        type=Path,
+        default=DEFAULT_LOCAL_OUTPUT,
+        help=f"Output file for local-image tasks. Default: {DEFAULT_LOCAL_OUTPUT}",
+    )
+    parser.add_argument(
+        "--gcs-output",
+        type=Path,
+        default=DEFAULT_GCS_OUTPUT,
+        help=f"Output file for GCS-backed tasks. Default: {DEFAULT_GCS_OUTPUT}",
+    )
+    parser.add_argument(
+        "--gcs-bucket",
+        default=os.getenv("LABEL_STUDIO_GCS_BUCKET"),
+        help="Optional GCS bucket name for cloud-backed imports.",
+    )
+    parser.add_argument(
+        "--gcs-prefix",
+        default=os.getenv("LABEL_STUDIO_GCS_PREFIX", ""),
+        help="Optional GCS prefix, such as 'fish_images/'.",
+    )
+    parser.add_argument(
+        "--model-version",
+        default=DEFAULT_MODEL_VERSION,
+        help=f"Model version written into predictions. Default: {DEFAULT_MODEL_VERSION}",
+    )
+    parser.add_argument(
+        "--skip-local-output",
+        action="store_true",
+        help="Do not generate a local tasks.json file.",
+    )
+    return parser.parse_args()
 
-    json_files = [f for f in os.listdir(GEMINI_JSON_FOLDER) if f.endswith('.json')]
 
+def normalize_gcs_prefix(prefix: str) -> str:
+    cleaned = prefix.strip("/")
+    return f"{cleaned}/" if cleaned else ""
+
+
+def load_detections(json_path: Path) -> list[dict[str, Any]] | None:
+    try:
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        print(f"  - Skipping {json_path.name}: invalid JSON ({exc}).")
+        return None
+
+    if not isinstance(payload, list):
+        print(f"  - Skipping {json_path.name}: expected a JSON list.")
+        return None
+    return [item for item in payload if isinstance(item, dict)]
+
+
+def build_ls_results(detections: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    for detection in detections:
+        box_coords = detection.get("box_2d")
+        label = detection.get("label")
+        if not (
+            isinstance(box_coords, list)
+            and len(box_coords) == 4
+            and all(isinstance(value, (int, float)) for value in box_coords)
+            and isinstance(label, str)
+            and label
+        ):
+            continue
+
+        y1_1000, x1_1000, y2_1000, x2_1000 = box_coords
+        results.append(
+            {
+                "from_name": "label",
+                "to_name": "image",
+                "type": "rectanglelabels",
+                "value": {
+                    "x": (x1_1000 / 1000) * 100,
+                    "y": (y1_1000 / 1000) * 100,
+                    "width": ((x2_1000 - x1_1000) / 1000) * 100,
+                    "height": ((y2_1000 - y1_1000) / 1000) * 100,
+                    "rotation": 0,
+                    "rectanglelabels": [label],
+                },
+            }
+        )
+    return results
+
+
+def find_original_image(image_dir: Path, stem: str) -> Path | None:
+    for extension in SUPPORTED_EXTENSIONS:
+        candidate = image_dir / f"{stem}{extension}"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def build_task(image_reference: str, results: list[dict[str, Any]], model_version: str) -> dict[str, Any]:
+    return {
+        "data": {"image": image_reference},
+        "predictions": [{"model_version": model_version, "result": results}],
+    }
+
+
+def write_json(output_path: Path, payload: list[dict[str, Any]]) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def convert_to_label_studio_format(args: argparse.Namespace) -> int:
+    if not args.json_dir.is_dir():
+        print(f"Error: JSON directory '{args.json_dir}' was not found.")
+        return 1
+    if not args.image_dir.is_dir():
+        print(f"Error: image directory '{args.image_dir}' was not found.")
+        return 1
+
+    json_files = sorted(args.json_dir.glob("*.json"))
     if not json_files:
-        print("No JSON files found to convert.")
-        return
+        print(f"No JSON files found in '{args.json_dir}'.")
+        return 0
 
-    for json_filename in json_files:
-        json_path = os.path.join(GEMINI_JSON_FOLDER, json_filename)
+    local_tasks: list[dict[str, Any]] = []
+    gcs_tasks: list[dict[str, Any]] = []
+    gcs_prefix = normalize_gcs_prefix(args.gcs_prefix)
 
-        with open(json_path, 'r', encoding='utf-8') as f:
-            gemini_results = json.load(f)
+    print(f"Starting conversion from '{args.json_dir}'...")
+    for json_path in json_files:
+        detections = load_detections(json_path)
+        if detections is None:
+            continue
 
-        ls_results = []
-        for bounding_box in gemini_results:
-            # ... (the conversion logic is the same)
-            box_coords = bounding_box.get("box_2d")
-            label = bounding_box.get("label")
-            if not (isinstance(box_coords, list) and len(box_coords) == 4):
-                continue
-            y1_1000, x1_1000, y2_1000, x2_1000 = box_coords
-            x_percent = (x1_1000 / 1000) * 100
-            y_percent = (y1_1000 / 1000) * 100
-            width_percent = ((x2_1000 - x1_1000) / 1000) * 100
-            height_percent = ((y2_1000 - y1_1000) / 1000) * 100
-            ls_results.append({
-                "from_name": "label", "to_name": "image", "type": "rectanglelabels",
-                "value": {"rectanglelabels": [label], "x": x_percent, "y": y_percent, "width": width_percent,
-                          "height": height_percent}
-            })
+        original_image = find_original_image(args.image_dir, json_path.stem)
+        if original_image is None:
+            print(f"  - Skipping {json_path.name}: matching source image not found.")
+            continue
 
-        # --- THIS IS THE CRITICAL CHANGE ---
-        # Generate the GCS path for Label Studio
-        image_basename = os.path.splitext(json_filename)[0]
-        # We need to find the original extension
-        original_image_name = ""
-        for ext in ['.png', '.jpg', '.jpeg', '.webp', '.bmp']:
-            if os.path.exists(os.path.join(ORIGINAL_IMAGE_FOLDER, image_basename + ext)):
-                original_image_name = image_basename + ext
-                break
+        results = build_ls_results(detections)
+        local_tasks.append(
+            build_task(str(original_image.resolve()), results, args.model_version)
+        )
 
-        image_path_for_ls = f"gs://{BUCKET_NAME}/{BUCKET_PREFIX}{original_image_name}"
+        if args.gcs_bucket:
+            gcs_reference = f"gs://{args.gcs_bucket}/{gcs_prefix}{original_image.name}"
+            gcs_tasks.append(build_task(gcs_reference, results, args.model_version))
 
-        label_studio_tasks.append({
-            "data": {"image": image_path_for_ls},
-            "predictions": [{"model_version": "gemini-2.5-flash", "result": ls_results}]
-        })
+    if not args.skip_local_output:
+        write_json(args.local_output, local_tasks)
+        print(f"  - Wrote {len(local_tasks)} local tasks to '{args.local_output}'.")
 
-    with open(LABEL_STUDIO_EXPORT_FILE, 'w', encoding='utf-8') as f:
-        json.dump(label_studio_tasks, f, ensure_ascii=False, indent=2)
+    if args.gcs_bucket:
+        write_json(args.gcs_output, gcs_tasks)
+        print(f"  - Wrote {len(gcs_tasks)} GCS tasks to '{args.gcs_output}'.")
+    else:
+        print("  - GCS export skipped. Set --gcs-bucket to generate cloud-backed tasks.")
 
-    print(f"\nConversion complete! ✨")
-    print(f"{len(label_studio_tasks)} tasks written to '{LABEL_STUDIO_EXPORT_FILE}'.")
+    print("Conversion complete.")
+    return 0
+
+
+def main() -> int:
+    return convert_to_label_studio_format(parse_args())
 
 
 if __name__ == "__main__":
-    convert_to_label_studio_format()
+    raise SystemExit(main())

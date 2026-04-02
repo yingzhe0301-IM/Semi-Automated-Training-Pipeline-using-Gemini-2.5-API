@@ -1,63 +1,40 @@
-# Semi‑Automated Object Detection Model Training Pipeline — Using Conversational Image Segmentation with Gemini 2.5 Flash
+# Gemini Image Detection Workflow
 
 ![cover](example/cover.png)
 
-Google’s brand‑new **Conversational Image Segmentation (CIS)** API in *Gemini 2.5 Flash* lets you describe what you want in plain English— _“Detect the spill on the desk that needs to be cleaned”_, or _“Find any construction worker **without a helmet**”_—and immediately receive bounding boxes (or masks).  
+This repository is a small Gemini-based labeling workflow:
 
-This repository shows how to turn those detections into high‑quality training data **and** how to feed that data back into an open‑source detector (YOLO) for *free, low‑latency inference*.
+- `gemini.py` runs object detection over a directory of images and saves:
+  - one JSON file per image
+  - one annotated preview image per image
+- `converter.py` turns Gemini detections into Label Studio task JSON
+- `check_gemini_api.py` verifies that your Gemini API key is configured and working
 
-> For well‑defined detection tasks, this semi‑automated workflow offers a **cost‑effective** and **time‑saving** path from raw images to a production‑ready model.
+The repository is still intentionally lightweight, but the scripts now share a
+clearer CLI surface and keep generated artifacts out of version control.
 
----
+## Repository Layout
 
-## 🚀 What Problem Does This Solve?
+| Path | Purpose |
+| --- | --- |
+| `gemini.py` | Batch Gemini inference over images in a folder |
+| `converter.py` | Export Gemini detections into Label Studio task JSON |
+| `check_gemini_api.py` | Quick SDK and API-key preflight |
+| `requirements.txt` | Minimal runtime dependencies |
+| `test_image/` | Sample input images |
+| `example/` | Screenshots and visual examples for the README |
+| `output_results/` | Generated JSON and annotated previews, created on demand |
+| `run.ipynb` | Notebook walkthrough for ad hoc experimentation |
 
-| Challenge of inference with Gemini           | Our Solution |
-|----------------------------------------------|--------------|
-| **💸 Cost** – every inference call is billed | Use Gemini to draft annotations, then train YOLO locally |
-| **⏱️ Latency** – cloud round‑trip time       | After fine‑tuning YOLO the model runs on‑device in milliseconds |
-| **🎯 Accuracy** – API misses edge‑cases      | Human‑in‑the‑loop review in Label Studio fixes bad boxes |
+## Setup
 
-
----
-
-## 🖼️ Example Queries
-
-<table>
-<tr>
-<td width="50%"><strong>Complex Scene – “Find the spill on the desk”</strong><br/><br/><img src="example/spill.png"></td>
-<td width="50%"><strong>Safety Compliance – “Detect workers <i>with</i> helmets”</strong><br/><br/><img src="example/person_with_helmet.PNG"></td>
-</tr>
-</table>
-
----
-
-## 📚 Repository Contents
-
-| Script / Folder | Purpose |
-|-----------------|---------|
-| `gemini.py` | Call the Gemini 2.5 CIS API, handle auth & retries |
-| `converter.py` | Convert Gemini response → Label Studio `rectanglelabels` JSON |
-| `check_gemini_api.py` | Quick sanity‑check of the API & your key |
-| `run.ipynb` | Interactive notebook: from images → Gemini → Label Studio JSON |
-| `output_results/` | Raw responses from the API (one *.json* per image) |
-| `test_image/` | Sample images to try out the pipeline |
-
----
-
-## 🔧 Requirements
-
-* **Python**  
-* A **Gemini API key** – get one from the [AI Studio console](https://aistudio.google.com/)  
-* (Optional) [Label Studio](https://labelstud.io/) for annotation review
-
-Install the minimal dependencies:
+Install dependencies:
 
 ```bash
-pip install --upgrade google-genai pillow
+python3 -m pip install -r requirements.txt
 ```
 
-Set your key (either variable name works):
+Set your API key with either environment variable:
 
 ```bash
 export GOOGLE_API_KEY="AIza...your_key..."
@@ -65,68 +42,71 @@ export GOOGLE_API_KEY="AIza...your_key..."
 export GEMINI_API_KEY="AIza...your_key..."
 ```
 
-### 🐟 Demo: Batch Fish Detector (Gemini 2.5 Flash)
-
-This repo started as a tiny proof‑of‑concept for spotting fish in video frames with Gemini 2.5’s Conversational Image Segmentation.  
-If you want a *minimal* example before diving into the full semi‑automated pipeline, try this:
-
-> **Prompt tip** – be explicit about **what** to detect and **what** to return.  
-> Example prompt  
-> ```text
-> Detect all fish in the image and return a JSON list with
-> "label" and "box_2d" = [ymin, xmin, ymax, xmax] on a 0‑1000 scale.
-> ```
-
-Run:
+Check the environment before running batch inference:
 
 ```bash
-python gemini.py           # or: jupyter notebook run.ipynb
+python3 check_gemini_api.py
 ```
 
-You will get, for each input frame:
-
-* an annotated PNG with green bounding boxes in `output_results/`
-* a matching JSON file containing the coordinates
-
-> **Billing note:** each CIS request is billed per call (free‑trial credits apply).  
-> Requesting bounding boxes—as we do here—is cheaper than full‑resolution masks.
-
----
-
-## ⚡ Quick Start
+If you only want to verify that the key exists locally:
 
 ```bash
-# 1. Put images into the input folder
-mkdir -p test_image
-cp ~/my_frames/*.jpg test_image/
-
-# 2. Run the detector (outputs JSON + annotated PNGs)
-python gemini.py
-
-# 3. Convert to Label Studio tasks
-python converter.py  # creates tasks.json & import_to_ls_gcs.json
-
-# 4. In Label Studio
-#    • Import tasks.json (local paths) or import_to_ls_gcs.json (GCS URLs)
-#    • Review / tweak boxes where necessary
-
-# 5. Export corrected dataset and train your favourite YOLO flavour 🚀
+python3 check_gemini_api.py --skip-api-call
 ```
 
----
+## Run Batch Detection
 
-## 🏗️ Semi‑Automated Training Pipeline
+The default workflow reads from `test_image/` and writes to `output_results/`:
 
-1. **API Draft Annotations** – Gemini detects objects of interest.  
-2. **Save to Cloud** – Store frames + detections on Google Cloud Storage.  
-3. **Annotation Review** – Load tasks into Label Studio, fix mistakes.  
-4. **Model Training** – Fine‑tune YOLO (or any detector) on the curated dataset.  
-5. **On‑Device Inference** – Deploy the trained model for zero‑cost, low‑latency predictions.
+```bash
+python3 gemini.py
+```
 
-![Annotated sample frame](example/annotated_frame.png)
+Useful overrides:
 
-## 🔗 References
+```bash
+python3 gemini.py \
+  --input-dir test_image \
+  --output-dir output_results \
+  --model gemini-3-flash-preview \
+  --delay 1.0
+```
 
-* [Conversational Image Segmentation with Gemini 2.5 – Official blog](https://developers.googleblog.com/en/conversational-image-segmentation-gemini-2-5/)
-* [Label Studio Documentation](https://labelstud.io/)
-* [YOLO11 Documentation](https://docs.ultralytics.com/models/yolo11/)
+The default prompt is tuned for fish detection. You can swap the prompt at the
+command line or through `GEMINI_PROMPT` when you want to reuse the script for a
+different object class.
+
+## Export to Label Studio
+
+Generate a local Label Studio import file:
+
+```bash
+python3 converter.py
+```
+
+This writes `tasks.json` with absolute image paths that match the images in
+`test_image/`.
+
+If you want a GCS-backed import as well:
+
+```bash
+python3 converter.py \
+  --gcs-bucket your-bucket-name \
+  --gcs-prefix fish_images/
+```
+
+That also writes `import_to_ls_gcs.json`.
+
+## Notes
+
+- Generated files such as `output_results/`, `tasks.json`, and
+  `import_to_ls_gcs.json` are ignored by Git.
+- Raw frame dumps such as `frames_jpg/` are also ignored so the repo root stays
+  usable.
+- `run.ipynb` is kept for interactive work, but the scripts are the canonical
+  entry points for repeatable runs.
+
+## References
+
+- [Gemini API docs](https://ai.google.dev/gemini-api/docs)
+- [Label Studio docs](https://labelstud.io/)
