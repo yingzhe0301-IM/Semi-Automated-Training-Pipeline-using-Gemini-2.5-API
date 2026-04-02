@@ -16,21 +16,16 @@ from typing import Any
 from google import genai
 from google.genai import types
 from PIL import Image, ImageDraw
-
-DEFAULT_INPUT_DIR = Path("test_image")
-DEFAULT_OUTPUT_DIR = Path("output_results")
-DEFAULT_MODEL = "gemini-3-flash-preview"
-DEFAULT_PROMPT = (
-    "Detect the fish in the image. The response must be a JSON list of objects. "
-    "Each object must contain a 'label' key with the text 'fish' and a 'box_2d' "
-    "key with the bounding box coordinates as [ymin, xmin, ymax, xmax], "
-    "normalized to a 0-1000 scale. If no fish are detected, return an empty "
-    "list []."
+from config import (
+    BOX_COLOR,
+    DEFAULT_DELAY_SECONDS,
+    DEFAULT_INPUT_DIR,
+    DEFAULT_MODEL,
+    DEFAULT_OUTPUT_DIR,
+    DEFAULT_PROMPT,
+    SUPPORTED_EXTENSIONS,
+    TEXT_COLOR,
 )
-DEFAULT_DELAY_SECONDS = 1.0
-SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
-BOX_COLOR = "#4FC3F7"
-TEXT_COLOR = "#E1F5FE"
 
 
 def parse_args() -> argparse.Namespace:

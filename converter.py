@@ -8,12 +8,20 @@ import os
 from pathlib import Path
 from typing import Any
 
-DEFAULT_JSON_DIR = Path("output_results")
-DEFAULT_IMAGE_DIR = Path("test_image")
-DEFAULT_LOCAL_OUTPUT = Path("tasks.json")
-DEFAULT_GCS_OUTPUT = Path("import_to_ls_gcs.json")
-DEFAULT_MODEL_VERSION = os.getenv("LABEL_STUDIO_MODEL_VERSION", "gemini-3-flash-preview")
-SUPPORTED_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".bmp")
+from config import (
+    DEFAULT_GCS_OUTPUT,
+    DEFAULT_INPUT_DIR,
+    DEFAULT_LABEL_STUDIO_MODEL_VERSION,
+    DEFAULT_LOCAL_OUTPUT,
+    DEFAULT_OUTPUT_DIR,
+    SUPPORTED_EXTENSIONS,
+)
+
+DEFAULT_JSON_DIR = DEFAULT_OUTPUT_DIR
+DEFAULT_IMAGE_DIR = DEFAULT_INPUT_DIR
+DEFAULT_MODEL_VERSION = os.getenv(
+    "LABEL_STUDIO_MODEL_VERSION", DEFAULT_LABEL_STUDIO_MODEL_VERSION
+)
 
 
 def parse_args() -> argparse.Namespace:

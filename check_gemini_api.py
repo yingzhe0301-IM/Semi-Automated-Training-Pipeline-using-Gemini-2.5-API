@@ -6,9 +6,7 @@ import argparse
 import os
 
 from google import genai
-
-DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
-DEFAULT_PROMPT = "Reply with exactly the word OK."
+from config import DEFAULT_CHECK_PROMPT, DEFAULT_MODEL
 
 
 def parse_args() -> argparse.Namespace:
@@ -22,8 +20,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--prompt",
-        default=DEFAULT_PROMPT,
-        help="Prompt used for the connectivity check.",
+        default=DEFAULT_CHECK_PROMPT,
+        help=f"Prompt used for the connectivity check. Default: {DEFAULT_CHECK_PROMPT}",
     )
     parser.add_argument(
         "--skip-api-call",

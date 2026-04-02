@@ -20,6 +20,7 @@ clearer CLI surface and keep generated artifacts out of version control.
 | `gemini.py` | Batch Gemini inference over images in a folder |
 | `converter.py` | Export Gemini detections into Label Studio task JSON |
 | `check_gemini_api.py` | Quick SDK and API-key preflight |
+| `config.py` | Shared default paths, prompts, export names, and model settings |
 | `requirements.txt` | Minimal runtime dependencies |
 | `test_image/` | Sample input images |
 | `example/` | Screenshots and visual examples for the README |
@@ -68,13 +69,14 @@ Useful overrides:
 python3 gemini.py \
   --input-dir test_image \
   --output-dir output_results \
-  --model gemini-3-flash-preview \
+  --model gemini-3.1-flash-lite-preview \
   --delay 1.0
 ```
 
 The default prompt is tuned for fish detection. You can swap the prompt at the
 command line or through `GEMINI_PROMPT` when you want to reuse the script for a
-different object class.
+different object class. If you want to change the repository defaults instead,
+edit `config.py`.
 
 ## Export to Label Studio
 
